@@ -608,7 +608,7 @@ func GetBestMatchReferFile(curFile string, referFile string, allFilesMap map[str
 
 	candidateVec := []string{}
 	strVec := strings.Split(referFile, "/")
-	referfileName := strVec[len(strVec)-1]	
+	referfileName := strVec[len(strVec)-1]
 
 	var fileNameMap map[string]string
 	if suffixFlag {
@@ -622,7 +622,7 @@ func GetBestMatchReferFile(curFile string, referFile string, allFilesMap map[str
 		if suffixFlag {
 			if !strings.HasSuffix(strFile, referFileTmp) {
 				continue
-			}	
+			}
 		} else {
 			preFile := pathToPreStr
 			if preFile == "" {
@@ -653,9 +653,17 @@ func GetBestMatchReferFile(curFile string, referFile string, allFilesMap map[str
 	}
 
 	for _, condidateStr := range candidateVec {
+		score := calcMatchStrScore(curFile, referFile, condidateStr)
+		// 如果候选文件属于忽略目录，降低其优先级
+		for _, ignoreDir := range GConfig.ImportShortNameIgnoreDirs {
+			if strings.Contains(condidateStr, ignoreDir) {
+				score -= 100000
+				break
+			}
+		}
 		oneResult := scoredMatchStruct{
 			candidateStr: condidateStr,
-			score:        calcMatchStrScore(curFile, referFile, condidateStr),
+			score:        score,
 		}
 		matchResults.results = append(matchResults.results, oneResult)
 	}

@@ -28,8 +28,15 @@ func (a *AllProject) CodeCompleteFile(strFile string, referNameStr string, refer
 	dirManager := common.GConfig.GetDirManager()
 	mainDir := dirManager.GetMainDir()
 
+	// 判断当前输入是否没有路径前缀（没有 . 或 /），用于决定是否同时插入纯文件名补全
+	hasPathPrefix := strings.ContainsAny(preFileStr, "./")
+
 	var tipList []common.OneTipFile
 	dirManager.GetAllCompleFile(mainDir, referType, suffixFlag, &tipList)
+
+	// 用于去重纯文件名补全
+	insertedFileNames := map[string]bool{}
+
 	for _, oneTip := range tipList {
 		var strName string
 		if common.GConfig.ReferMatchPathFlag {
@@ -47,6 +54,56 @@ func (a *AllProject) CodeCompleteFile(strFile string, referNameStr string, refer
 		}
 
 		a.completeCache.InsertCompleteNormal(strName, oneTip.StrDesc, "", common.IKVariable)
+
+	}
+
+	// 非全路径模式下，且用户尚未输入路径分隔符，额外插入纯文件名补全（两遍：优先非忽略目录）
+	if !common.GConfig.ReferMatchPathFlag && !hasPathPrefix {
+		// 第一遍：插入来自非忽略目录的纯文件名
+		for _, oneTip := range tipList {
+			lastDot := strings.LastIndexAny(oneTip.StrName, "./")
+			var fileOnly string
+			if lastDot >= 0 {
+				fileOnly = oneTip.StrName[lastDot+1:]
+			} else {
+				fileOnly = oneTip.StrName
+			}
+			if fileOnly == "" || insertedFileNames[fileOnly] {
+				continue
+			}
+			// 判断是否属于忽略目录
+			inIgnoreDir := false
+			for _, ignoreDir := range common.GConfig.ImportShortNameIgnoreDirs {
+				if strings.Contains(oneTip.StrName, ignoreDir) {
+					inIgnoreDir = true
+					break
+				}
+			}
+			if !inIgnoreDir {
+				insertedFileNames[fileOnly] = true
+				a.completeCache.InsertCompleteNormal(fileOnly, oneTip.StrDesc, "", common.IKVariable)
+			}
+		}
+		// 第二遍：对忽略目录的文件，仅在文件名尚未被第一遍占用时才兜底插入
+		for _, oneTip := range tipList {
+			lastDot := strings.LastIndexAny(oneTip.StrName, "./")
+			var fileOnly string
+			if lastDot >= 0 {
+				fileOnly = oneTip.StrName[lastDot+1:]
+			} else {
+				fileOnly = oneTip.StrName
+			}
+			if fileOnly == "" || insertedFileNames[fileOnly] {
+				continue
+			}
+			for _, ignoreDir := range common.GConfig.ImportShortNameIgnoreDirs {
+				if strings.Contains(oneTip.StrName, ignoreDir) {
+					insertedFileNames[fileOnly] = true
+					a.completeCache.InsertCompleteNormal(fileOnly, oneTip.StrDesc, "", common.IKVariable)
+					break
+				}
+			}
+		}
 	}
 }
 

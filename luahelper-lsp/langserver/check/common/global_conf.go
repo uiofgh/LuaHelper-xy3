@@ -38,6 +38,9 @@ type GlobalConfig struct {
 	// 当一个lua文件引入其他的lua文件时候，需要匹配全路径，0为否，后台专业定制时候需要填写1
 	ReferMatchPathFlag bool
 
+	// import/require 纯文件名补全时，忽略这些目录下的同名文件（用于去重时过滤）
+	ImportShortNameIgnoreDirs []string
+
 	//lua内部定义的函数、模块、变量，检查时候进行忽略
 	LuaInMap map[string]string
 
@@ -250,28 +253,29 @@ type (
 
 	// JSONConfig 对外封装的json全局配置信息
 	JSONConfig struct {
-		BaseDir               string              `json:"BaseDir"`               // 所有工程的根目录
-		ShowWarnFlag          int                 `json:"ShowWarnFlag"`          // 是否显示告警, 0为不显示，其他的为显示
-		ReferMatchPathFlag    int                 `json:"ReferMatchPathFlag"`    // 当一个lua文件引入其他的lua文件时候，需要匹配全路径，0为否
-		IgnoreFileNameVarFlag int                 `json:"IgnoreFileNameVarFlag"` // 是否忽略与文件名同名的变量，客户端需要屏蔽这种变量
-		ProjectFiles          []string            `json:"ProjectFiles"`          // 工程的入口文件
-		IgnoreModules         []string            `json:"IgnoreModules"`         // 忽略的模块
-		IgnoreWildcardModules []string            `json:"IgnoreWildcardModules"` // 忽略的包含通配符的模块
-		IgnoreFileVars        []ignoreFileVar     `json:"IgnoreFileVars"`        // 忽略指定文件中的变量
-		IgnoreReadFiles       []string            `json:"IgnoreReadFiles"`       // 读不到某些文件时候，不报错，忽略（windows可能没有某些配置文件）
-		IgnoreErrorTypes      []int               `json:"IgnoreErrorTypes"`      // 忽略指定类型的错误
-		IgnoreFileOrFloder    []string            `json:"IgnoreFileOrFloder"`    // 忽略分析的文件或文件夹
-		IgnoreFileErr         []string            `json:"IgnoreFileErr"`         // 忽略下列文件中的错误
-		IgnoreFileErrTypes    []ignoreFileErrType `json:"IgnoreFileErrTypes"`    // 忽略指定文件中的指定类型错误
-		IgnoreLocalNoUseVars  []string            `json:"IgnoreLocalNoUseVars"`  // 忽略哪些局部变量定义了未使用的
-		ProtocolVars          []string            `json:"ProtocolVars"`          // 项目中特有的协议数组，例如有c2s, s2s
-		ProtocolPreIngoreFlag int                 `json:"ProtocolPreIngoreFlag"` // 协议前缀变量未找到，是否告警, 默认告警
-		ReferFrameFiles       []referFrameFile    `json:"ReferFrameFiles"`       // 项目中引用其他的框架文件
-		PathSeparator         string              `json:"PathSeparator"`         // 项目中引入其他文件，路径分隔符，默认为. 例如require("one.b") 表示引入one/b.lua 文件
-		AnntotateSets         []AnntotateSet      `json:"AnntotateSets"`         // 自动推导的注解方式
-		OtherDir              string              `json:"OtherDir"`              // 引入另外一个目录，可以用于设置引入额外LuaHelper注解格式文件夹
-		OpenErrorTypes        []int               `json:"OpenErrorTypes"`        // 开启的告警项
-		GlobalFiles           []string            `json:"GlobalFiles"`           // 只将这些文件的全局变量添加到_G中
+		BaseDir                   string              `json:"BaseDir"`                   // 所有工程的根目录
+		ShowWarnFlag              int                 `json:"ShowWarnFlag"`              // 是否显示告警, 0为不显示，其他的为显示
+		ReferMatchPathFlag        int                 `json:"ReferMatchPathFlag"`        // 当一个lua文件引入其他的lua文件时候，需要匹配全路径，0为否
+		ImportShortNameIgnoreDirs []string            `json:"ImportShortNameIgnoreDirs"` // import/require 纯文件名补全时，忽略这些目录下的同名文件（用于去重时过滤）
+		IgnoreFileNameVarFlag     int                 `json:"IgnoreFileNameVarFlag"`     // 是否忽略与文件名同名的变量，客户端需要屏蔽这种变量
+		ProjectFiles              []string            `json:"ProjectFiles"`              // 工程的入口文件
+		IgnoreModules             []string            `json:"IgnoreModules"`             // 忽略的模块
+		IgnoreWildcardModules     []string            `json:"IgnoreWildcardModules"`     // 忽略的包含通配符的模块
+		IgnoreFileVars            []ignoreFileVar     `json:"IgnoreFileVars"`            // 忽略指定文件中的变量
+		IgnoreReadFiles           []string            `json:"IgnoreReadFiles"`           // 读不到某些文件时候，不报错，忽略（windows可能没有某些配置文件）
+		IgnoreErrorTypes          []int               `json:"IgnoreErrorTypes"`          // 忽略指定类型的错误
+		IgnoreFileOrFloder        []string            `json:"IgnoreFileOrFloder"`        // 忽略分析的文件或文件夹
+		IgnoreFileErr             []string            `json:"IgnoreFileErr"`             // 忽略下列文件中的错误
+		IgnoreFileErrTypes        []ignoreFileErrType `json:"IgnoreFileErrTypes"`        // 忽略指定文件中的指定类型错误
+		IgnoreLocalNoUseVars      []string            `json:"IgnoreLocalNoUseVars"`      // 忽略哪些局部变量定义了未使用的
+		ProtocolVars              []string            `json:"ProtocolVars"`              // 项目中特有的协议数组，例如有c2s, s2s
+		ProtocolPreIngoreFlag     int                 `json:"ProtocolPreIngoreFlag"`     // 协议前缀变量未找到，是否告警, 默认告警
+		ReferFrameFiles           []referFrameFile    `json:"ReferFrameFiles"`           // 项目中引用其他的框架文件
+		PathSeparator             string              `json:"PathSeparator"`             // 项目中引入其他文件，路径分隔符，默认为. 例如require("one.b") 表示引入one/b.lua 文件
+		AnntotateSets             []AnntotateSet      `json:"AnntotateSets"`             // 自动推导的注解方式
+		OtherDir                  string              `json:"OtherDir"`                  // 引入另外一个目录，可以用于设置引入额外LuaHelper注解格式文件夹
+		OpenErrorTypes            []int               `json:"OpenErrorTypes"`            // 开启的告警项
+		GlobalFiles               []string            `json:"GlobalFiles"`               // 只将这些文件的全局变量添加到_G中
 	}
 )
 
@@ -651,6 +655,7 @@ func (g *GlobalConfig) ReadConfig(strDir, configFileName string, checkFlagList [
 
 	g.ReferMatchPathFlag = (jsonConfig.ReferMatchPathFlag == 1)
 	g.showWarnFlag = (jsonConfig.ShowWarnFlag == 1)
+	g.ImportShortNameIgnoreDirs = jsonConfig.ImportShortNameIgnoreDirs
 
 	g.IgnoreFileNameVarFlag = (jsonConfig.IgnoreFileNameVarFlag == 1)
 

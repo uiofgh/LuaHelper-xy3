@@ -80,6 +80,48 @@ export function activate(context: vscode.ExtensionContext) {
 
     savedContext.subscriptions.push(vscode.languages.setLanguageConfiguration("lua", new LuaLanguageConfiguration()));
 
+    // 注册基于文档词汇的补全 Provider，弥补 LSP 补全会抑制 VSCode 内置 wordBasedSuggestions 的问题
+    savedContext.subscriptions.push(
+        vscode.languages.registerCompletionItemProvider(
+            { scheme: 'file', language: LANGUAGE_ID },
+            {
+                provideCompletionItems(document: vscode.TextDocument, position: vscode.Position) {
+                    // 提取当前光标前的单词前缀
+                    const wordRange = document.getWordRangeAtPosition(position, /[a-zA-Z_][a-zA-Z0-9_]*/);
+                    const prefix = wordRange ? document.getText(wordRange) : '';
+                    if (prefix.length < 1) {
+                        return undefined;
+                    }
+
+                    // 扫描整个文档，收集所有匹配前缀的标识符
+                    const text = document.getText();
+                    const wordRegex = /[a-zA-Z_][a-zA-Z0-9_]*/g;
+                    const seen = new Set<string>();
+                    const items: vscode.CompletionItem[] = [];
+                    const lowerPrefix = prefix.toLowerCase();
+
+                    let match: RegExpExecArray | null;
+                    while ((match = wordRegex.exec(text)) !== null) {
+                        const word = match[0];
+                        // 跳过太短的词、已收集的词、与前缀完全相同的词（正在输入中）
+                        if (word.length < 2 || seen.has(word) || word === prefix) {
+                            continue;
+                        }
+                        if (!word.toLowerCase().startsWith(lowerPrefix)) {
+                            continue;
+                        }
+                        seen.add(word);
+                        const item = new vscode.CompletionItem(word, vscode.CompletionItemKind.Text);
+                        // 排序靠后，优先展示 LSP 符号补全
+                        item.sortText = 'z_' + word;
+                        items.push(item);
+                    }
+                    return items;
+                }
+            }
+        )
+    );
+
     // 公共变量赋值
     let pkg = require(context.extensionPath + "/package.json");
     Tools.adapterVersion = pkg.version;

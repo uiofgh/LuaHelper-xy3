@@ -330,11 +330,14 @@ func (a *AllProject) varInfoDeepComplete(symbol *common.Symbol, symList []*commo
 	}
 
 	referInfo := lastSymbol.VarInfo.ReferInfo
+	log.Debug("varInfoDeepComplete: lastSymbol.FileName=%s, referInfo=%v", lastSymbol.FileName, referInfo)
 	var referFile *results.FileResult
 	if referInfo != nil {
 		referFile = a.GetFirstReferFileResult(referInfo)
 		if referFile == nil {
 			log.Error("lspCodeComplete import file error, module=%s", completeVar.StrVec[0])
+		} else {
+			log.Debug("varInfoDeepComplete: referFile=%s", referFile.Name)
 		}
 	}
 
@@ -342,10 +345,12 @@ func (a *AllProject) varInfoDeepComplete(symbol *common.Symbol, symList []*commo
 	explanFlag := true
 	if referFile != nil {
 		referSubType := a.GetReferFrameType(referInfo)
+		log.Debug("varInfoDeepComplete: referSubType=%v", referSubType)
 		if referSubType == common.RtypeImport {
 			// import引用一个文件，代码补全
 			explanFlag = false
 			if !completeVar.ColonFlag {
+				log.Debug("varInfoDeepComplete: calling getImportFileComlete for %s", referFile.Name)
 				a.getImportFileComlete(referFile)
 			}
 		} else if referSubType == common.RtypeRequire {
@@ -419,7 +424,10 @@ func (a *AllProject) otherPreComplete(comParam *CommonFuncParam, completeVar *co
 		Exp:       completeVar.Exp,
 	}
 
+	log.Debug("otherPreComplete: calling FindVarDefine, StrVec=%v IsFuncVec=%v Exp=%v LastEmptyFlag=%v",
+		varStruct.StrVec, varStruct.IsFuncVec, varStruct.Exp != nil, completeVar.LastEmptyFlag)
 	symbol, symList := a.FindVarDefine(comParam.fileResult.Name, &varStruct)
+	log.Debug("otherPreComplete: FindVarDefine returned symbol=%v symListLen=%d", symbol != nil, len(symList))
 	if symbol == nil {
 		// 判断是否为系统模块函数提示
 		if a.systemMoudleComplete(strFind) {

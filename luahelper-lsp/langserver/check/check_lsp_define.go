@@ -5,6 +5,7 @@ import (
 	"luahelper-lsp/langserver/check/annotation/annotatelexer"
 	"luahelper-lsp/langserver/check/annotation/annotateparser"
 	"luahelper-lsp/langserver/check/common"
+	"luahelper-lsp/langserver/check/compiler/ast"
 	"luahelper-lsp/langserver/check/compiler/lexer"
 	"luahelper-lsp/langserver/check/results"
 	"luahelper-lsp/langserver/log"
@@ -404,14 +405,64 @@ func (a *AllProject) FindVarDefine(strFile string, varStruct *common.DefineVarSt
 		return
 	}
 
-	if varStruct.StrVec[0] == "require" && varStruct.IsFuncVec[0] && varStruct.Exp != nil {
+	if (varStruct.StrVec[0] == "require" || common.GConfig.IsFrameReferOtherFile(varStruct.StrVec[0])) &&
+		varStruct.IsFuncVec[0] && varStruct.Exp != nil {
 		findExpList := []common.FindExpFile{}
-		oldSymbol = a.FindVarReferSymbol(comParam.fileResult.Name, varStruct.Exp, comParam, &findExpList, 1)
+		// 解析 import("ubase") / require("ubase") 得到模块符号（带 ReferInfo）
+		moduleSymbol := a.FindVarReferSymbol(comParam.fileResult.Name, varStruct.Exp, comParam, &findExpList, 1)
 
-		// require，已经处理了。上面已经进行了特殊的处理
-		if len(varStruct.IsFuncVec) > 0 {
-			varStruct.IsFuncVec[0] = false
+		if moduleSymbol == nil {
+			return nil, nil
 		}
+
+		// 使用局部变量，避免直接修改 varStruct 导致调用方数据被污染
+		remainKeys := varStruct.StrVec[1:]
+
+		// 如果没有后续成员（如 import("ubase"). 触发补全），把 moduleSymbol 放入 symList
+		// 让 varInfoDeepComplete 能检测到 ReferInfo 并展开 import 文件的成员
+		if len(remainKeys) == 0 {
+			oldSymbol = moduleSymbol
+			symList = []*common.Symbol{moduleSymbol}
+			return oldSymbol, symList
+		}
+
+		// 有后续成员（如 import("ubase").UBase），逐层在模块符号上查找
+		// moduleSymbol 带有 ReferInfo，symbolHasSubKey 会通过 varInfoHasSubKey →
+		// getReferReferInfoSymbol 在目标文件中找到正确的成员
+		lastSymbol := moduleSymbol
+		for _, strKey := range remainKeys {
+			found := a.symbolHasSubKey(lastSymbol, strKey, comParam, &findExpList)
+			if found == nil {
+				// 尝试深层追踪
+				if lastSymbol.VarInfo != nil {
+					tmpList := a.FindDeepSymbolList(lastSymbol.FileName, lastSymbol.VarInfo.ReferExp, comParam, &findExpList, false, lastSymbol.VarInfo.VarIndex)
+					for _, s := range tmpList {
+						found = a.symbolHasSubKey(s, strKey, comParam, &findExpList)
+						if found != nil {
+							break
+						}
+					}
+				}
+			}
+			if found == nil {
+				return nil, nil
+			}
+			lastSymbol = found
+		}
+		oldSymbol = lastSymbol
+		symList = a.FindDeepSymbolList(oldSymbol.FileName, func() ast.Exp {
+			if oldSymbol.VarInfo != nil {
+				return oldSymbol.VarInfo.ReferExp
+			}
+			return nil
+		}(), comParam, &findExpList, true, func() uint8 {
+			if oldSymbol.VarInfo != nil {
+				return oldSymbol.VarInfo.VarIndex
+			}
+			return 1
+		}())
+		symList = append([]*common.Symbol{oldSymbol}, symList...)
+		return oldSymbol, symList
 	} else {
 		// 最初始的第一次查找，原始的
 		findStrName, findVar := a.findOldDefineInfo(comParam, varStruct)

@@ -761,13 +761,17 @@ func (a *AllProject) getImportReferSymbol(luaInFile string, funcExp *ast.FuncCal
 		return nil
 	}
 
-	if oneRefer.ReferType == common.ReferTypeRequire {
-		find, returnExp := referFile.MainFunc.GetLastOneReturnExp()
-		if !find {
-			return nil
-		}
-
-		symbol = a.FindVarReferSymbol(referFile.Name, returnExp, comParam, findExpList, 1)
+	if oneRefer.ReferType == common.ReferTypeRequire || oneRefer.ReferType == common.ReferTypeFrame {
+		// 构造一个携带 ReferInfo 的虚拟 VarInfo，使 symbolHasSubKey 能通过
+		// varInfoHasSubKey → getReferReferInfoSymbol 路径正确地在目标文件中查找子键。
+		// 不直接解析 return 表达式，因为那样返回的 Symbol 没有 ReferInfo，
+		// 会导致 symbolHasSubKey 找不到成员（例如 import("ubase").UBase 中的 UBase）。
+		newVar := common.CreateVarInfo(luaInFile, common.LuaTypeRefer, funcExp, funcExp.Loc, 1)
+		newVar.ReferInfo = oneRefer
+		symbol = common.GetDefaultSymbol(luaInFile, newVar)
+		log.Debug("getImportReferSymbol: built symbol with ReferInfo for file=%s", referFile.Name)
+	} else {
+		log.Debug("getImportReferSymbol: unhandled ReferType=%v for %s", oneRefer.ReferType, callExp.Name)
 	}
 
 	return symbol

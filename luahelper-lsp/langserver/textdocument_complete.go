@@ -110,6 +110,8 @@ func (l *LspServer) TextDocumentComplete(ctx context.Context, vs lsp.CompletionP
 	} else {
 		// 5.4) 按照.进行分割字符串
 		compVar, flag = getComplelteStruct(preCompStr, (int)(comResult.pos.Line), (int)(comResult.pos.Character))
+		log.Debug("TextDocumentComplete getComplelteStruct flag=%v StrVec=%v IsFuncVec=%v Exp=%v LastEmptyFlag=%v",
+			flag, compVar.StrVec, compVar.IsFuncVec, compVar.Exp != nil, compVar.LastEmptyFlag)
 		if !flag {
 			return
 		}
@@ -131,6 +133,9 @@ func (l *LspServer) TextDocumentComplete(ctx context.Context, vs lsp.CompletionP
 
 	project.CodeComplete(strFile, compVar)
 	items := l.convertToCompItems(preStr)
+	if len(items) == 0 {
+		return
+	}
 	log.Debug("TextDocumentComplete str=%s, veclen=%d", preCompStr, len(items))
 	return CompletionListTmp{
 		IsIncomplete: false,
@@ -470,7 +475,9 @@ func getComplelteStruct(str string, line, character int) (completeVar common.Com
 		Exp:           varStruct.Exp,
 	}
 
-	if len(varStruct.StrVec) == 1 && varStruct.StrVec[0] != "" {
+	// 当 lastEmptyFlag=true 时（用户输入了 . 或 : 触发成员补全），
+	// 不应按首字母过滤补全列表——所有成员都应展示
+	if len(varStruct.StrVec) == 1 && varStruct.StrVec[0] != "" && !lastEmptyFlag {
 		oneStr := varStruct.StrVec[0]
 		oneChar := oneStr[0]
 		completeVar.FilterCharacterFlag = false // 查找的结果，是否过滤指定的字符

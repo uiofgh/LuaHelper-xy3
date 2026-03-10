@@ -771,7 +771,10 @@
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
         "package": "vsce package",
-        "publish": "vsce package"
+        "publish": "vsce package",
+        "build-lsp-mac": "cd ../luahelper-lsp && go build -o ../luahelper-vscode/server/maclualsp .",
+        "build-lsp-linux": "cd ../luahelper-lsp && go build -o ../luahelper-vscode/server/linuxlualsp .",
+        "build-lsp-win": "cd ../luahelper-lsp && go build -o ../luahelper-vscode/server/lualsp.exe ."
     },
     "devDependencies": {
         "@types/mocha": "^7.0.2",
